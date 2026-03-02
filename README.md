@@ -1,9 +1,10 @@
 # Fastrr
 
-A **memory layer** for AI applications: per-user, versioned workspaces on disk. Use it from your app to give each user (or session) a persistent directory, read/write files there, and sync with a single call.
+A **semantic memory layer** for AI applications: per-user, versioned workspaces on disk. Your app calls `remember`, `recall`, and `forget`; LLM-powered agents handle how memories are stored and retrieved.
 
 - **Per-user isolation**: One workspace per `user_id`; no cross-user access.
 - **Versioned**: Backed by Git (one branch per user), so you get history and rollback.
+- **Agent-driven**: Writer and Reader agents (via [Agno](https://github.com/agno-agi/agno)) organise and retrieve memory intelligently.
 - **Library-first**: Install and call from any Python app; no server required.
 
 ## Install
@@ -14,7 +15,7 @@ uv add fastrr
 pip install fastrr
 ```
 
-## Use as a library
+## Quick Start
 
 ```python
 from fastrr import Fastrr
@@ -25,28 +26,50 @@ memory = Fastrr(
     worktree_root="./data/users",
 )
 
-# Get (or create) this user's workspace; returns a path
-path = memory.get_user_path("alice")
+# Store a memory — the writer agent decides how to organise it
+memory.remember("alice", "Prefers concise bullet-point answers.")
 
-# Your app reads/writes any files under that path
-(path / "context.json").write_text('{"last_topic": "greetings"}')
-(path / "notes.md").write_text("# Session notes\n...")
+# Retrieve memory relevant to a query
+context = memory.recall("alice", query="communication style")
 
-# Persist changes
-memory.sync("alice")
+# Or summarise all memory for a user
+summary = memory.recall("alice")
 
-# Optional: list users, remove a user
-memory.list_users()   # ["alice", ...]
-memory.remove_user("bob")
+# Remove all memory for a user
+memory.forget("alice")
+
+# List users with active workspaces
+memory.list_users()  # ["alice", ...]
 ```
 
 ## API
 
 | Method | Description |
 |--------|-------------|
-| `get_user_path(user_id)` | Returns the path to the user's workspace (creates it if needed). |
-| `sync(user_id, message="sync")` | Commits and persists changes in that workspace. |
-| `list_users()` | List user IDs that have a workspace. |
-| `remove_user(user_id)` | Remove the user's workspace and branch. |
+| `remember(user_id, content)` | Persist a memory for this user. The writer agent stores and organises it on disk. |
+| `recall(user_id, query=None)` | Retrieve memory relevant to `query`, or summarise all memory if no query given. |
+| `forget(user_id)` | Remove all stored memory for this user. |
+| `list_users()` | Return user IDs that have an active memory workspace. |
 
 Storage is local only (no remote). You can plug in a custom backend by implementing the `RepoManager` protocol and passing it to `Fastrr(repo_manager=...)`.
+
+## Configuration
+
+Fastrr uses LLM agents for memory operations. Configure the provider via environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `FASTRR_PROVIDER` | `ollama` or `openrouter` | `ollama` |
+| `FASTRR_MODEL` | Model ID (e.g. `llama3.2`, `openai/gpt-4o`) | `llama3.2` |
+| `OLLAMA_HOST` | Ollama server URL | `http://localhost:11434` |
+| `OPENROUTER_API_KEY` | Required when using `openrouter` | — |
+
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for details.
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) — How Fastrr works under the hood
+- [Configuration](docs/CONFIGURATION.md) — LLM providers and environment variables
+- [Usage](docs/USAGE.md) — Detailed usage examples and extensibility
+- [Development](docs/DEVELOPMENT.md) — Contributing, testing, and running locally
+- [Evals](evals/README.md) — Dataset download and memory evaluation

@@ -32,3 +32,7 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Evals - datasets can be large (~3MB+), use evals/download.py
+evals/datasets/*.json
+evals/output/

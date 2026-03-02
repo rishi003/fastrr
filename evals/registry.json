@@ -1,0 +1,26 @@
+{
+  "locomo10": {
+    "source": "https://github.com/snap-research/locomo",
+    "url": "https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json",
+    "filename": "locomo10.json",
+    "description": "LoCoMo: 10 very long-term conversations with QA annotations (ACL 2024)"
+  },
+  "longmemeval_oracle": {
+    "source": "https://github.com/xiaowu0162/LongMemEval",
+    "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_oracle.json",
+    "filename": "longmemeval_oracle.json",
+    "description": "LongMemEval oracle: 500 questions with evidence sessions only (ICLR 2025)"
+  },
+  "longmemeval_s": {
+    "source": "https://github.com/xiaowu0162/LongMemEval",
+    "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json",
+    "filename": "longmemeval_s_cleaned.json",
+    "description": "LongMemEval S: ~40 history sessions, ~115k tokens (ICLR 2025)"
+  },
+  "longmemeval_m": {
+    "source": "https://github.com/xiaowu0162/LongMemEval",
+    "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_m_cleaned.json",
+    "filename": "longmemeval_m_cleaned.json",
+    "description": "LongMemEval M: ~500 sessions per question (ICLR 2025)"
+  }
+}
