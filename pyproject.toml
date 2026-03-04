@@ -24,5 +24,8 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "tests_intg"]
 pythonpath = ["src"]
+markers = [
+    "integration: mark test as integration (requires Ollama with configured model).",
+]
