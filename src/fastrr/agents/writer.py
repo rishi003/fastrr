@@ -14,12 +14,28 @@ When asked to store a memory for a user:
    "history.jsonl", "facts.md") based on the content type and existing files.
 3. If the file exists and the new content belongs with existing content, use
    append_file to add to it. If starting fresh, use write_file.
-4. Always call sync after writing to persist changes.
 
 Use short, clear filenames. Prefer markdown for prose notes, JSONL for
 structured entries, and plain text for simple facts.
 Never make up data. Only store what you are explicitly given.
+
+End your response with exactly one line that summarises what you stored, in
+the imperative mood and under 72 characters. Prefix it with "COMMIT: ".
+Example: COMMIT: add preferred communication style to preferences.md
 """.strip()
+
+_COMMIT_PREFIX = "COMMIT: "
+
+
+def _extract_commit_message(response) -> str:
+    """Extract the COMMIT: summary line from the agent response, or fall back to 'remember'."""
+    text = getattr(response, "content", None) or ""
+    for line in reversed(text.splitlines()):
+        line = line.strip()
+        if line.startswith(_COMMIT_PREFIX):
+            return line[len(_COMMIT_PREFIX):].strip()[:72]
+    return "remember"
+
 
 _REMOVE_INSTRUCTIONS = """
 You are a memory cleanup agent. Your job is to remove a user's workspace entirely.
@@ -43,7 +59,9 @@ class WriterAgent:
     def store(self, user_id: str, content: str) -> None:
         """Ask the agent to store `content` in the user's workspace."""
         prompt = f"Store the following memory for user '{user_id}':\n\n{content}"
-        self._agent.run(prompt)
+        response = self._agent.run(prompt)
+        commit_msg = _extract_commit_message(response)
+        self._toolset.sync(user_id, message=commit_msg)
 
     def remove(self, user_id: str) -> None:
         """Remove the user's workspace entirely."""
