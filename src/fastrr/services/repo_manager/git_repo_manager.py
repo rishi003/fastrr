@@ -1,11 +1,13 @@
 """Git-backed implementation of RepoManager: one storage repo, one worktree per user (local only)."""
 
 import shutil
+from datetime import timezone
 from pathlib import Path
 from threading import RLock
 
 import git
 
+from fastrr.history import RepoHistoryEntry
 from fastrr.services.repo_manager.base import RepoManager
 
 
@@ -125,3 +127,38 @@ class GitRepoManager(RepoManager):
             for d in self.worktree_root.iterdir()
             if d.is_dir() and (d / ".git").exists()
         ]
+
+    def get_user_history(self, user_id: str, limit: int) -> list[RepoHistoryEntry]:
+        if limit <= 0:
+            raise ValueError("limit must be > 0")
+
+        branch = self._user_branch(user_id)
+        if branch not in (h.name for h in self.repo.heads):
+            return []
+
+        safe_limit = min(limit, 200)
+        commits = list(self.repo.iter_commits(branch, max_count=safe_limit))
+
+        entries: list[RepoHistoryEntry] = []
+        for commit in commits:
+            timestamp = (
+                commit.committed_datetime.astimezone(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z")
+            )
+            changed_files = list(commit.stats.files.keys())
+            diff_text = self.repo.git.show(
+                commit.hexsha,
+                "--pretty=format:",
+                "--unified=0",
+            )
+            entries.append(
+                RepoHistoryEntry(
+                    commit=commit.hexsha,
+                    timestamp=timestamp,
+                    message=commit.message.strip(),
+                    changed_files=changed_files,
+                    diff_text=diff_text,
+                )
+            )
+        return entries

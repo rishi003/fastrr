@@ -3,6 +3,8 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from fastrr.history import RepoHistoryEntry
+
 
 class RepoManager(ABC):
     """Contract for per-user workspace storage. Implementations: Git (and others later)."""
@@ -30,4 +32,9 @@ class RepoManager(ABC):
     @abstractmethod
     def list_users(self) -> list[str]:
         """List user IDs that have an active workspace."""
+        ...
+
+    @abstractmethod
+    def get_user_history(self, user_id: str, limit: int) -> list[RepoHistoryEntry]:
+        """Return newest-first history entries for this user."""
         ...

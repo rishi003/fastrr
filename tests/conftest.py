@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from fastrr.history import RepoHistoryEntry
 from fastrr.services.repo_manager.base import RepoManager
 
 
@@ -42,6 +43,9 @@ class FakeRepoManager(RepoManager):
             for d in self._root.iterdir()
             if d.is_dir()
         ]
+
+    def get_user_history(self, user_id: str, limit: int) -> list[RepoHistoryEntry]:
+        return []
 
 
 @pytest.fixture

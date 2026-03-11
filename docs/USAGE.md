@@ -46,6 +46,16 @@ List users with active workspaces.
 users = memory.list_users()  # ["alice", "bob", ...]
 ```
 
+### history
+
+Inspect memory changes for a user over time.
+
+```python
+events = memory.history("alice", limit=20)
+for event in events:
+    print(event.timestamp, event.summary)
+```
+
 ## Extensibility
 
 ### Custom RepoManager
@@ -54,7 +64,7 @@ Implement the `RepoManager` protocol for custom storage backends:
 
 ```python
 from pathlib import Path
-from fastrr import Fastrr
+from fastrr import Fastrr, RepoHistoryEntry
 from fastrr.services.repo_manager import RepoManager
 
 class MyRepoManager(RepoManager):
@@ -63,6 +73,7 @@ class MyRepoManager(RepoManager):
     def sync_user(self, user_id: str, message: str = "sync") -> None: ...
     def remove_user(self, user_id: str, *, wipe_remote: bool = False) -> None: ...
     def list_users(self) -> list[str]: ...
+    def get_user_history(self, user_id: str, limit: int) -> list[RepoHistoryEntry]: ...
 
 memory = Fastrr(
     storage_path="./data/repo",

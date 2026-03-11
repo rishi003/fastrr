@@ -48,6 +48,7 @@ memory.list_users()  # ["alice", ...]
 |--------|-------------|
 | `remember(user_id, content)` | Persist a memory for this user. The writer agent stores and organises it on disk. |
 | `recall(user_id, query=None)` | Retrieve memory relevant to `query`, or summarise all memory if no query given. |
+| `history(user_id, limit=20)` | Return newest-first memory history events with commit metadata, changed files, and deterministic summaries. |
 | `forget(user_id)` | Remove all stored memory for this user. |
 | `list_users()` | Return user IDs that have an active memory workspace. |
 

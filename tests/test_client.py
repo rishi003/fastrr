@@ -5,9 +5,19 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fastrr import Fastrr
+from fastrr import Fastrr, MemoryHistoryEvent, RepoHistoryEntry
+from fastrr.services.repo_manager import GitRepoManager
 
-from conftest import FakeRepoManager
+
+def test_memory_history_event_importable() -> None:
+    event = MemoryHistoryEvent(
+        commit="abc123",
+        timestamp="2026-03-11T00:00:00Z",
+        message="remember",
+        changed_files=["preferences.md"],
+        summary="added memory to preferences.md",
+    )
+    assert event.commit == "abc123"
 
 
 @pytest.fixture
@@ -16,7 +26,7 @@ def mock_model() -> MagicMock:
 
 
 @pytest.fixture
-def mock_agent_run(fake_repo_manager: FakeRepoManager):
+def mock_agent_run(fake_repo_manager):
     """Patch Agno Agent so run() returns a response with content; no real LLM calls.
     Writer run() side_effect ensures worktree for 'alice' on store and calls remove_user on remove.
     """
@@ -37,7 +47,7 @@ def mock_agent_run(fake_repo_manager: FakeRepoManager):
 
 
 def test_list_users_empty(
-    fake_repo_manager: FakeRepoManager,
+    fake_repo_manager,
     mock_model: MagicMock,
     mock_agent_run: MagicMock,
 ) -> None:
@@ -51,7 +61,7 @@ def test_list_users_empty(
 
 
 def test_remember_then_list_users_includes_user(
-    fake_repo_manager: FakeRepoManager,
+    fake_repo_manager,
     mock_model: MagicMock,
     mock_agent_run: MagicMock,
 ) -> None:
@@ -66,7 +76,7 @@ def test_remember_then_list_users_includes_user(
 
 
 def test_remember_always_syncs(
-    fake_repo_manager: FakeRepoManager,
+    fake_repo_manager,
     mock_model: MagicMock,
     mock_agent_run: MagicMock,
 ) -> None:
@@ -85,7 +95,7 @@ def test_remember_always_syncs(
 
 
 def test_remember_uses_commit_message_from_agent(
-    fake_repo_manager: FakeRepoManager,
+    fake_repo_manager,
     mock_model: MagicMock,
 ) -> None:
     """When the agent response contains a COMMIT: line it is used as the commit message."""
@@ -112,7 +122,7 @@ def test_remember_uses_commit_message_from_agent(
 
 
 def test_recall_returns_mocked_string(
-    fake_repo_manager: FakeRepoManager,
+    fake_repo_manager,
     mock_model: MagicMock,
     mock_agent_run: MagicMock,
 ) -> None:
@@ -128,7 +138,7 @@ def test_recall_returns_mocked_string(
 
 
 def test_forget_then_list_users_excludes_user(
-    fake_repo_manager: FakeRepoManager,
+    fake_repo_manager,
     mock_model: MagicMock,
     mock_agent_run: MagicMock,
 ) -> None:
@@ -142,3 +152,78 @@ def test_forget_then_list_users_excludes_user(
     assert "alice" in memory.list_users()
     memory.forget("alice")
     assert "alice" not in memory.list_users()
+
+
+def test_history_limit_validation(
+    fake_repo_manager,
+    mock_model: MagicMock,
+    mock_agent_run: MagicMock,
+) -> None:
+    memory = Fastrr(
+        storage_path=Path("/tmp/s"),
+        worktree_root=Path("/tmp/w"),
+        repo_manager=fake_repo_manager,
+        model=mock_model,
+    )
+    with pytest.raises(ValueError, match="limit must be > 0"):
+        memory.history("alice", limit=0)
+
+
+def test_history_maps_repo_entries(
+    fake_repo_manager,
+    mock_model: MagicMock,
+    mock_agent_run: MagicMock,
+) -> None:
+    fake_repo_manager.get_user_history = MagicMock(
+        return_value=[
+            RepoHistoryEntry(
+                commit="abc123",
+                timestamp="2026-03-11T00:00:00Z",
+                message="update preference",
+                changed_files=["preferences.md"],
+                diff_text="@@\n-old\n+new\n",
+            )
+        ]
+    )
+    memory = Fastrr(
+        storage_path=Path("/tmp/s"),
+        worktree_root=Path("/tmp/w"),
+        repo_manager=fake_repo_manager,
+        model=mock_model,
+    )
+    events = memory.history("alice", limit=5)
+    assert events[0].changed_files == ["preferences.md"]
+    assert "updated" in events[0].summary.lower()
+
+
+def test_history_empty_for_unknown_user(
+    fake_repo_manager,
+    mock_model: MagicMock,
+    mock_agent_run: MagicMock,
+) -> None:
+    memory = Fastrr(
+        storage_path=Path("/tmp/s"),
+        worktree_root=Path("/tmp/w"),
+        repo_manager=fake_repo_manager,
+        model=mock_model,
+    )
+    assert memory.history("missing", limit=10) == []
+
+
+def test_history_empty_for_unknown_user_with_git_repo(
+    tmp_path: Path,
+    mock_model: MagicMock,
+) -> None:
+    storage = tmp_path / "repo"
+    worktrees = tmp_path / "worktrees"
+    repo_manager = GitRepoManager(storage, worktrees)
+    with patch("fastrr.agents.writer.Agent", return_value=MagicMock()), patch(
+        "fastrr.agents.reader.Agent", return_value=MagicMock()
+    ):
+        memory = Fastrr(
+            storage_path=storage,
+            worktree_root=worktrees,
+            repo_manager=repo_manager,
+            model=mock_model,
+        )
+    assert memory.history("missing", limit=10) == []

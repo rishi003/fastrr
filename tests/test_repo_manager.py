@@ -1,7 +1,6 @@
 """Unit tests for GitRepoManager."""
 
 from pathlib import Path
-
 import git
 import pytest
 
@@ -68,3 +67,45 @@ def test_remove_user_removes_worktree_and_branch(
     assert not worktree_path.exists()
     branch_names = [h.name for h in git_repo_manager.repo.heads]
     assert "user/alice" not in branch_names
+
+
+def test_get_user_history_newest_first(git_repo_manager: GitRepoManager) -> None:
+    git_repo_manager.ensure_user_worktree("alice")
+    worktree_path = git_repo_manager.get_worktree_path("alice")
+    (worktree_path / "a.md").write_text("first")
+    git_repo_manager.sync_user("alice", "first commit")
+    (worktree_path / "a.md").write_text("second")
+    git_repo_manager.sync_user("alice", "second commit")
+
+    events = git_repo_manager.get_user_history("alice", limit=10)
+    assert len(events) == 2
+    assert events[0].message == "second commit"
+    assert events[1].message == "first commit"
+
+
+def test_get_user_history_missing_branch_returns_empty(
+    git_repo_manager: GitRepoManager,
+) -> None:
+    assert git_repo_manager.get_user_history("missing", limit=10) == []
+
+
+def test_get_user_history_invalid_limit_raises(
+    git_repo_manager: GitRepoManager,
+) -> None:
+    with pytest.raises(ValueError, match="limit must be > 0"):
+        git_repo_manager.get_user_history("alice", limit=0)
+
+
+def test_get_user_history_limit_is_capped(
+    git_repo_manager: GitRepoManager,
+) -> None:
+    git_repo_manager.ensure_user_worktree("alice")
+    worktree_path = git_repo_manager.get_worktree_path("alice")
+    for i in range(205):
+        (worktree_path / "a.md").write_text(f"v{i}")
+        git_repo_manager.sync_user("alice", f"commit-{i}")
+
+    events = git_repo_manager.get_user_history("alice", limit=500)
+    assert len(events) == 200
+    assert events[0].message == "commit-204"
+    assert events[-1].message == "commit-5"

@@ -14,6 +14,8 @@ from fastrr.agents.search import SearchStrategy
 from fastrr.agents.toolset import MemoryToolset
 from fastrr.agents.writer import WriterAgent
 from fastrr.core.config import FastrrConfig
+from fastrr.history import MemoryHistoryEvent
+from fastrr.history_summary import summarize_memory_change
 from fastrr.services.repo_manager import GitRepoManager, RepoManager
 
 
@@ -97,3 +99,24 @@ class Fastrr:
     def list_users(self) -> list[str]:
         """Return user IDs that have an active memory workspace."""
         return self._repo.list_users()
+
+    def history(self, user_id: str, limit: int = 20) -> list[MemoryHistoryEvent]:
+        """Return newest-first memory history entries for this user."""
+        if limit <= 0:
+            raise ValueError("limit must be > 0")
+
+        entries = self._repo.get_user_history(user_id, limit=limit)
+        return [
+            MemoryHistoryEvent(
+                commit=entry.commit,
+                timestamp=entry.timestamp,
+                message=entry.message,
+                changed_files=entry.changed_files,
+                summary=summarize_memory_change(
+                    entry.message,
+                    entry.changed_files,
+                    entry.diff_text,
+                ),
+            )
+            for entry in entries
+        ]
