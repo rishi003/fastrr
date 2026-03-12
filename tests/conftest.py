@@ -11,40 +11,34 @@ from fastrr.services.repo_manager.base import RepoManager
 
 class FakeRepoManager(RepoManager):
     """
-    In-memory RepoManager for tests: one subdir per user under a single root.
-    No Git; sync_user is a no-op.
+    In-memory RepoManager for tests: one workspace under a single root.
+    No Git; sync is a no-op.
     """
 
     def __init__(self, root: Path):
         self._root = Path(root)
         self._root.mkdir(parents=True, exist_ok=True)
 
-    def get_worktree_path(self, user_id: str) -> Path:
-        return self._root / user_id
+    def get_workspace_path(self) -> Path:
+        return self._root
 
-    def ensure_user_worktree(self, user_id: str) -> str:
-        path = self.get_worktree_path(user_id)
-        path.mkdir(parents=True, exist_ok=True)
-        return str(path.resolve())
+    def ensure_workspace(self) -> str:
+        self._root.mkdir(parents=True, exist_ok=True)
+        return str(self._root.resolve())
 
-    def sync_user(self, user_id: str, message: str = "sync") -> None:
+    def sync(self, message: str = "sync") -> None:
         pass
 
-    def remove_user(self, user_id: str, *, wipe_remote: bool = False) -> None:
-        path = self.get_worktree_path(user_id)
-        if path.exists():
-            shutil.rmtree(path)
-
-    def list_users(self) -> list[str]:
+    def forget(self) -> None:
         if not self._root.exists():
-            return []
-        return [
-            d.name
-            for d in self._root.iterdir()
-            if d.is_dir()
-        ]
+            return
+        for item in self._root.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink(missing_ok=True)
 
-    def get_user_history(self, user_id: str, limit: int) -> list[RepoHistoryEntry]:
+    def get_history(self, limit: int) -> list[RepoHistoryEntry]:
         return []
 
 

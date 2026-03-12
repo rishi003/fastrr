@@ -4,16 +4,17 @@
 
 ### remember
 
-Store a memory for a user. The writer agent decides how to organise it (e.g. `preferences.md`, `history.jsonl`).
+Store a memory. The writer agent decides how to organise it (e.g.
+`preferences.md`, `history.jsonl`).
 
 ```python
 from fastrr import Fastrr
 
-memory = Fastrr(storage_path="./data/repo", worktree_root="./data/users")
+memory = Fastrr(storage_path="./data/repo")
 
-memory.remember("alice", "Prefers concise bullet-point answers.")
-memory.remember("alice", "Works in the healthcare industry.")
-memory.remember("bob", "Likes dark mode and minimal UIs.")
+memory.remember("Prefers concise bullet-point answers.")
+memory.remember("Works in the healthcare industry.")
+memory.remember("Likes dark mode and minimal UIs.")
 ```
 
 ### recall
@@ -22,36 +23,28 @@ Retrieve memory. With a `query`, returns content relevant to that query. Without
 
 ```python
 # Query-specific recall
-context = memory.recall("alice", query="communication style")
+context = memory.recall(query="communication style")
 # → "Prefers concise bullet-point answers."
 
 # Full summary
-summary = memory.recall("alice")
-# → Synthesised summary of all stored memory for alice
+summary = memory.recall()
+# → Synthesised summary of all stored memory
 ```
 
 ### forget
 
-Remove all memory for a user.
+Remove all stored memory.
 
 ```python
-memory.forget("bob")
-```
-
-### list_users
-
-List users with active workspaces.
-
-```python
-users = memory.list_users()  # ["alice", "bob", ...]
+memory.forget()
 ```
 
 ### history
 
-Inspect memory changes for a user over time.
+Inspect memory changes over time.
 
 ```python
-events = memory.history("alice", limit=20)
+events = memory.history(limit=20)
 for event in events:
     print(event.timestamp, event.summary)
 ```
@@ -68,16 +61,14 @@ from fastrr import Fastrr, RepoHistoryEntry
 from fastrr.services.repo_manager import RepoManager
 
 class MyRepoManager(RepoManager):
-    def get_worktree_path(self, user_id: str) -> Path: ...
-    def ensure_user_worktree(self, user_id: str) -> str: ...
-    def sync_user(self, user_id: str, message: str = "sync") -> None: ...
-    def remove_user(self, user_id: str, *, wipe_remote: bool = False) -> None: ...
-    def list_users(self) -> list[str]: ...
-    def get_user_history(self, user_id: str, limit: int) -> list[RepoHistoryEntry]: ...
+    def get_workspace_path(self) -> Path: ...
+    def ensure_workspace(self) -> str: ...
+    def sync(self, message: str = "sync") -> None: ...
+    def forget(self) -> None: ...
+    def get_history(self, limit: int) -> list[RepoHistoryEntry]: ...
 
 memory = Fastrr(
     storage_path="./data/repo",
-    worktree_root="./data/users",
     repo_manager=MyRepoManager(...),
 )
 ```
@@ -97,7 +88,6 @@ class VectorSearch(SearchStrategy):
 
 memory = Fastrr(
     storage_path="./data/repo",
-    worktree_root="./data/users",
     search_strategy=VectorSearch(),
 )
 ```
@@ -112,7 +102,6 @@ from fastrr import Fastrr
 
 memory = Fastrr(
     storage_path="./data/repo",
-    worktree_root="./data/users",
     model=Claude(id="claude-3-5-sonnet-20241022"),
 )
 ```
@@ -123,7 +112,7 @@ memory = Fastrr(
 |--------|-------------|
 | `Fastrr` | Main client class |
 | `RepoManager` | Abstract protocol for storage backends |
-| `GitRepoManager` | Default Git worktree implementation |
+| `GitRepoManager` | Default single-repo Git implementation |
 | `SearchStrategy` | Abstract search interface |
 | `RegexSearch` | Default regex-based search |
 

@@ -69,9 +69,7 @@ def fastrr_config() -> FastrrConfig:
 def fastrr_client(tmp_path: Path, ollama_available: None, fastrr_config: FastrrConfig) -> Fastrr:
     """Fastrr client with real Git repo and real Ollama; isolated per test via tmp_path."""
     storage_path = tmp_path / "repo"
-    worktree_root = tmp_path / "worktrees"
     return Fastrr(
         storage_path=storage_path,
-        worktree_root=worktree_root,
         config=fastrr_config,
     )

@@ -34,25 +34,24 @@ class Fastrr:
     """
     Semantic memory layer for AI applications.
 
-    Creates per-user, versioned workspaces on disk. Agents handle how
-    memories are organised and retrieved; the caller only needs to use
-    remember / recall / forget.
+    Creates one versioned workspace on disk. Agents handle how memories are
+    organised and retrieved; the caller only needs to use remember / recall /
+    forget.
 
     LLM provider is configured via environment variables (see FastrrConfig).
 
     Example:
         from fastrr import Fastrr
 
-        memory = Fastrr(storage_path="./data/repo", worktree_root="./data/users")
-        memory.remember("alice", "Prefers concise bullet-point answers.")
-        context = memory.recall("alice", query="communication style")
-        memory.forget("alice")
+        memory = Fastrr(storage_path="./data/repo")
+        memory.remember("Prefers concise bullet-point answers.")
+        context = memory.recall(query="communication style")
+        memory.forget()
     """
 
     def __init__(
         self,
         storage_path: str | Path,
-        worktree_root: str | Path,
         *,
         repo_manager: Optional[RepoManager] = None,
         model: Optional[Model] = None,
@@ -62,7 +61,6 @@ class Fastrr:
         """
         Args:
             storage_path:     Path to the Git storage repo (created if missing).
-            worktree_root:    Directory where per-user worktrees are mounted.
             repo_manager:     Override the default GitRepoManager (useful for tests).
             model:            Override the Agno Model (takes precedence over env config).
             search_strategy:  Override the memory search strategy (default: RegexSearch).
@@ -70,42 +68,36 @@ class Fastrr:
         """
         cfg = config or FastrrConfig()
         resolved_model = model or _build_model(cfg)
-        resolved_repo = repo_manager or GitRepoManager(
-            Path(storage_path), Path(worktree_root)
-        )
+        resolved_repo = repo_manager or GitRepoManager(Path(storage_path))
 
         toolset = MemoryToolset(resolved_repo)
         self._writer = WriterAgent(toolset, resolved_model)
         self._reader = ReaderAgent(toolset, resolved_model, search_strategy)
         self._repo = resolved_repo
 
-    def remember(self, user_id: str, content: str) -> None:
+    def remember(self, content: str) -> None:
         """
-        Persist a memory for this user.
+        Persist a memory.
         The writer agent decides how to store and organise it on disk.
         """
-        self._writer.store(user_id, content)
+        self._writer.store(content)
 
-    def recall(self, user_id: str, query: Optional[str] = None) -> str:
+    def recall(self, query: Optional[str] = None) -> str:
         """
         Retrieve memory relevant to `query`, or summarise all memory if no query given.
         """
-        return self._reader.search(user_id, query)
+        return self._reader.search(query)
 
-    def forget(self, user_id: str) -> None:
-        """Remove all stored memory for this user."""
-        self._writer.remove(user_id)
+    def forget(self) -> None:
+        """Remove all stored memory."""
+        self._writer.remove()
 
-    def list_users(self) -> list[str]:
-        """Return user IDs that have an active memory workspace."""
-        return self._repo.list_users()
-
-    def history(self, user_id: str, limit: int = 20) -> list[MemoryHistoryEvent]:
-        """Return newest-first memory history entries for this user."""
+    def history(self, limit: int = 20) -> list[MemoryHistoryEvent]:
+        """Return newest-first memory history entries."""
         if limit <= 0:
             raise ValueError("limit must be > 0")
 
-        entries = self._repo.get_user_history(user_id, limit=limit)
+        entries = self._repo.get_history(limit=limit)
         return [
             MemoryHistoryEvent(
                 commit=entry.commit,

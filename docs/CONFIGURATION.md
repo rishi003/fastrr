@@ -53,7 +53,6 @@ from fastrr.core.config import FastrrConfig
 config = FastrrConfig(provider="openrouter", model="anthropic/claude-3-haiku")
 memory = Fastrr(
     storage_path="./data/repo",
-    worktree_root="./data/users",
     config=config,
 )
 ```
@@ -66,7 +65,6 @@ from fastrr import Fastrr
 
 memory = Fastrr(
     storage_path="./data/repo",
-    worktree_root="./data/users",
     model=OpenAI(id="gpt-4o", api_key="sk-..."),
 )
 ```

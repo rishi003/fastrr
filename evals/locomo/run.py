@@ -148,7 +148,7 @@ def run_eval(
     with open(dataset_path) as f:
         data = json.load(f)
 
-    num_users = min(10, len(data))
+    num_conversations = min(10, len(data))
 
     # Create eval model and agent (uses FASTRR_* env vars, Ollama by default)
     eval_model = _build_eval_model()
@@ -163,38 +163,39 @@ def run_eval(
 
     # Create repo and paths first (same for direct or agent-based ingest)
     storage_path = Path(tempfile.mkdtemp(prefix="fastrr_locomo_repo_"))
-    worktree_root = Path(tempfile.mkdtemp(prefix="fastrr_locomo_wt_"))
     if use_fake_repo:
         from evals.fake_repo import FakeRepoManager
         root = Path(tempfile.mkdtemp(prefix="fastrr_locomo_"))
         repo = FakeRepoManager(root)
         storage_path = root / "repo"
-        worktree_root = root / "users"
         storage_path.mkdir(parents=True, exist_ok=True)
-        worktree_root.mkdir(parents=True, exist_ok=True)
         logger.info("Storage: FakeRepoManager (no Git)")
     else:
         from fastrr.services.repo_manager import GitRepoManager
-        repo = GitRepoManager(storage_path, worktree_root)
-        logger.info("Storage: Git worktrees")
+        repo = GitRepoManager(storage_path)
+        logger.info("Storage: Git repository")
 
     # 1. Ingest
     step_start = time.monotonic()
     if direct_ingest:
         logger.info("Step 1/3: Ingesting conversations (direct write, no LLM)...")
         toolset = MemoryToolset(repo)
-        ingest_locomo_direct(toolset, dataset_path, num_users=num_users, log=logger.info)
-        memory = Fastrr(storage_path=storage_path, worktree_root=worktree_root, repo_manager=repo)
+        ingest_locomo_direct(toolset, dataset_path, num_users=num_conversations, log=logger.info)
+        memory = Fastrr(storage_path=storage_path, repo_manager=repo)
     else:
-        memory = Fastrr(storage_path=storage_path, worktree_root=worktree_root, repo_manager=repo)
+        memory = Fastrr(storage_path=storage_path, repo_manager=repo)
         logger.info("Step 1/3: Ingesting conversations into memory...")
         ingest_locomo(
             memory,
             dataset_path,
-            num_users=num_users,
+            num_conversations=num_conversations,
             log=logger.info,
         )
-    logger.info("  Done. Ingested %d conversations in %s.", num_users, _elapsed(time.monotonic() - step_start))
+    logger.info(
+        "  Done. Ingested %d conversations in %s.",
+        num_conversations,
+        _elapsed(time.monotonic() - step_start),
+    )
     logger.info("")
 
     # 2. Recall + Generate + Grade
@@ -204,22 +205,21 @@ def run_eval(
     scores_by_category: dict[str, list[bool]] = defaultdict(list)
     total_qa = sum(
         len([q for q in data[i].get("qa", []) if q.get("category") != 5])
-        for i in range(num_users)
+        for i in range(num_conversations)
     )
     done = 0
 
     def _progress(done: int, total: int, group: int, n_group: int, q_in_group: int, n_in_group: int) -> None:
         elapsed = _elapsed(time.monotonic() - step_start)
-        line = f"  Group {group + 1}/{num_users} | Question {q_in_group}/{n_in_group} | {done}/{total} total | {elapsed}"
+        line = f"  Group {group + 1}/{num_conversations} | Question {q_in_group}/{n_in_group} | {done}/{total} total | {elapsed}"
         sys.stderr.write(f"\r{line}    ")
         sys.stderr.flush()
 
-    for group_idx in range(num_users):
-        user_id = f"locomo_{group_idx}"
+    for group_idx in range(num_conversations):
         qa_set = data[group_idx].get("qa", [])
         qa_filtered = [qa for qa in qa_set if qa.get("category") != 5]
         n_qa = len(qa_filtered)
-        logger.info("  Group %d/%d: %d questions", group_idx + 1, num_users, n_qa)
+        logger.info("  Group %d/%d: %d questions", group_idx + 1, num_conversations, n_qa)
 
         for q_idx, qa in enumerate(qa_filtered):
             question = qa.get("question", "")
@@ -227,7 +227,7 @@ def run_eval(
             if gold is None:
                 continue
             # Sequential: one Ollama round-trip at a time (recall → generate → grade)
-            context = memory.recall(user_id, query=question)
+            context = memory.recall(query=question)
             answer = _generate_answer(answer_agent, context, question)
             grade = _grade_answer(grade_agent, question, gold, answer)
 
@@ -237,12 +237,13 @@ def run_eval(
                 sys.stderr.write("\n")  # newline before verbose so progress line doesn't overwrite
                 logger.debug("[%s] %d/%d Q: %s...", mark, done, total_qa, question[:60])
             else:
-                _progress(done, total_qa, group_idx, num_users, q_idx + 1, n_qa)
+                _progress(done, total_qa, group_idx, num_conversations, q_idx + 1, n_qa)
 
             cat = qa.get("category", 0)
             cat_name = CATEGORY_NAMES.get(cat, "unknown")
             scores_by_category[cat_name].append(grade)
-            results[user_id].append(
+            group_key = f"group_{group_idx}"
+            results[group_key].append(
                 {
                     "question": question,
                     "answer": answer,

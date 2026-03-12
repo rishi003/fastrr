@@ -11,7 +11,7 @@ from pathlib import Path
 
 class SearchStrategy(ABC):
     """
-    Abstract strategy for searching a user's memory workspace.
+    Abstract strategy for searching the memory workspace.
 
     Implementations receive the workspace root directory and a query string,
     and return a list of relevant text snippets for the ReaderAgent to summarise.
@@ -23,7 +23,7 @@ class SearchStrategy(ABC):
         Search for content relevant to `query` under `root`.
 
         Args:
-            root: The user's workspace root directory.
+            root: The workspace root directory.
             query: Free-text or regex query string.
 
         Returns:

@@ -9,103 +9,77 @@ from fastrr.services.repo_manager.git_repo_manager import GitRepoManager
 
 @pytest.fixture
 def git_repo_manager(tmp_path: Path) -> GitRepoManager:
-    """Create a GitRepoManager with temp storage and worktree roots."""
+    """Create a GitRepoManager with a temp storage root."""
     storage = tmp_path / "storage"
-    worktrees = tmp_path / "worktrees"
-    return GitRepoManager(storage, worktrees)
+    return GitRepoManager(storage)
 
 
-def test_get_worktree_path(git_repo_manager: GitRepoManager) -> None:
-    path = git_repo_manager.get_worktree_path("alice")
-    assert path == git_repo_manager.worktree_root / "alice"
+def test_get_workspace_path(git_repo_manager: GitRepoManager) -> None:
+    path = git_repo_manager.get_workspace_path()
+    assert path == git_repo_manager.storage_path
 
 
-def test_ensure_user_worktree_creates_worktree_and_branch(
-    git_repo_manager: GitRepoManager,
-) -> None:
-    path_str = git_repo_manager.ensure_user_worktree("alice")
+def test_ensure_workspace_returns_repo_path(git_repo_manager: GitRepoManager) -> None:
+    path_str = git_repo_manager.ensure_workspace()
     path = Path(path_str)
     assert path.exists()
-    # Worktree is a valid git repo (path is the worktree root)
-    worktree_repo = git.Repo(path)
+    workspace_repo = git.Repo(path)
     assert (path / ".git").exists()
-    # Worktree root matches get_worktree_path
-    assert path == git_repo_manager.get_worktree_path("alice")
+    assert workspace_repo.working_tree_dir == str(path)
 
 
-def test_list_users_after_ensure(git_repo_manager: GitRepoManager) -> None:
-    assert git_repo_manager.list_users() == []
-    git_repo_manager.ensure_user_worktree("alice")
-    assert git_repo_manager.list_users() == ["alice"]
+def test_sync_commits_after_adding_file(git_repo_manager: GitRepoManager) -> None:
+    git_repo_manager.ensure_workspace()
+    workspace = git_repo_manager.get_workspace_path()
+    (workspace / "note.txt").write_text("hello")
+    git_repo_manager.sync("msg")
+    repo = git.Repo(workspace)
+    assert not repo.is_dirty(untracked_files=True)
 
 
-def test_list_users_empty_after_remove_user(git_repo_manager: GitRepoManager) -> None:
-    git_repo_manager.ensure_user_worktree("alice")
-    assert "alice" in git_repo_manager.list_users()
-    git_repo_manager.remove_user("alice")
-    assert git_repo_manager.list_users() == []
+def test_forget_removes_workspace_files(git_repo_manager: GitRepoManager) -> None:
+    git_repo_manager.ensure_workspace()
+    workspace = git_repo_manager.get_workspace_path()
+    (workspace / "a.md").write_text("hello")
+    (workspace / "nested").mkdir()
+    (workspace / "nested" / "b.md").write_text("world")
+    git_repo_manager.forget()
+    assert not (workspace / "a.md").exists()
+    assert not (workspace / "nested").exists()
+    assert (workspace / ".git").exists()
 
 
-def test_sync_user_commits_after_adding_file(
-    git_repo_manager: GitRepoManager,
-) -> None:
-    git_repo_manager.ensure_user_worktree("alice")
-    worktree_path = git_repo_manager.get_worktree_path("alice")
-    (worktree_path / "note.txt").write_text("hello")
-    git_repo_manager.sync_user("alice", "msg")
-    worktree_repo = git.Repo(worktree_path)
-    assert not worktree_repo.is_dirty(untracked_files=True)
+def test_get_history_newest_first(git_repo_manager: GitRepoManager) -> None:
+    git_repo_manager.ensure_workspace()
+    workspace = git_repo_manager.get_workspace_path()
+    (workspace / "a.md").write_text("first")
+    git_repo_manager.sync("first commit")
+    (workspace / "a.md").write_text("second")
+    git_repo_manager.sync("second commit")
 
-
-def test_remove_user_removes_worktree_and_branch(
-    git_repo_manager: GitRepoManager,
-) -> None:
-    git_repo_manager.ensure_user_worktree("alice")
-    worktree_path = git_repo_manager.get_worktree_path("alice")
-    assert worktree_path.exists()
-    git_repo_manager.remove_user("alice")
-    assert not worktree_path.exists()
-    branch_names = [h.name for h in git_repo_manager.repo.heads]
-    assert "user/alice" not in branch_names
-
-
-def test_get_user_history_newest_first(git_repo_manager: GitRepoManager) -> None:
-    git_repo_manager.ensure_user_worktree("alice")
-    worktree_path = git_repo_manager.get_worktree_path("alice")
-    (worktree_path / "a.md").write_text("first")
-    git_repo_manager.sync_user("alice", "first commit")
-    (worktree_path / "a.md").write_text("second")
-    git_repo_manager.sync_user("alice", "second commit")
-
-    events = git_repo_manager.get_user_history("alice", limit=10)
+    events = git_repo_manager.get_history(limit=10)
     assert len(events) == 2
     assert events[0].message == "second commit"
     assert events[1].message == "first commit"
 
 
-def test_get_user_history_missing_branch_returns_empty(
-    git_repo_manager: GitRepoManager,
-) -> None:
-    assert git_repo_manager.get_user_history("missing", limit=10) == []
+def test_get_history_empty_repo_returns_empty(git_repo_manager: GitRepoManager) -> None:
+    assert git_repo_manager.get_history(limit=10) == []
 
 
-def test_get_user_history_invalid_limit_raises(
-    git_repo_manager: GitRepoManager,
-) -> None:
+def test_get_history_invalid_limit_raises(git_repo_manager: GitRepoManager) -> None:
     with pytest.raises(ValueError, match="limit must be > 0"):
-        git_repo_manager.get_user_history("alice", limit=0)
+        git_repo_manager.get_history(limit=0)
 
 
-def test_get_user_history_limit_is_capped(
-    git_repo_manager: GitRepoManager,
-) -> None:
-    git_repo_manager.ensure_user_worktree("alice")
-    worktree_path = git_repo_manager.get_worktree_path("alice")
+def test_get_history_limit_is_capped(git_repo_manager: GitRepoManager) -> None:
+    git_repo_manager.ensure_workspace()
+    workspace = git_repo_manager.get_workspace_path()
     for i in range(205):
-        (worktree_path / "a.md").write_text(f"v{i}")
-        git_repo_manager.sync_user("alice", f"commit-{i}")
+        (workspace / "a.md").write_text(f"v{i}")
+        git_repo_manager.sync(f"commit-{i}")
 
-    events = git_repo_manager.get_user_history("alice", limit=500)
+    events = git_repo_manager.get_history(limit=500)
     assert len(events) == 200
     assert events[0].message == "commit-204"
     assert events[-1].message == "commit-5"

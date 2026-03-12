@@ -58,7 +58,7 @@ from fastrr import Fastrr
 from fastrr.services.repo_manager import RepoManager
 
 class FakeRepoManager(RepoManager):
-    # In-memory implementation; sync_user is a no-op
+    # In-memory implementation; sync is a no-op
     ...
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def fake_repo_manager(tmp_path):
     return FakeRepoManager(tmp_path)
 
 def test_remember(memory_with_fake_repo):
-    memory_with_fake_repo.remember("alice", "test")
+    memory_with_fake_repo.remember("test")
     # ...
 ```
 
@@ -81,7 +81,7 @@ The `evals/` directory contains evaluation datasets (e.g. `locomo10.json`). See 
 | Package | Purpose |
 |---------|---------|
 | `agno` | LLM agents (Reader, Writer) |
-| `gitpython` | Git worktrees |
+| `gitpython` | Git repository management |
 | `pydantic` / `pydantic-settings` | Config |
 | `pytest` | Tests |
 | `redis` / `redisvl` | Declared for future semantic search |

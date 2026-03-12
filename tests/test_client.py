@@ -28,15 +28,13 @@ def mock_model() -> MagicMock:
 @pytest.fixture
 def mock_agent_run(fake_repo_manager):
     """Patch Agno Agent so run() returns a response with content; no real LLM calls.
-    Writer run() side_effect ensures worktree for 'alice' on store and calls remove_user on remove.
+    Writer run() side_effect clears memory on remove.
     """
     mock_instance = MagicMock()
 
     def run_side_effect(prompt: str):
-        if "Store" in prompt and "alice" in prompt:
-            fake_repo_manager.ensure_user_worktree("alice")
-        elif "Remove" in prompt and "alice" in prompt:
-            fake_repo_manager.remove_user("alice")
+        if "Clear all memory" in prompt:
+            fake_repo_manager.forget()
         return MagicMock(content="mocked recall")
 
     mock_instance.run.side_effect = run_side_effect
@@ -46,33 +44,24 @@ def mock_agent_run(fake_repo_manager):
         yield mock_instance
 
 
-def test_list_users_empty(
+def test_remember_writes_memory(
     fake_repo_manager,
     mock_model: MagicMock,
-    mock_agent_run: MagicMock,
 ) -> None:
-    memory = Fastrr(
-        storage_path=Path("/tmp/s"),
-        worktree_root=Path("/tmp/w"),
-        repo_manager=fake_repo_manager,
-        model=mock_model,
+    mock_instance = MagicMock()
+    mock_instance.run.return_value = MagicMock(
+        content="Stored memory.\nCOMMIT: remember preference"
     )
-    assert memory.list_users() == []
-
-
-def test_remember_then_list_users_includes_user(
-    fake_repo_manager,
-    mock_model: MagicMock,
-    mock_agent_run: MagicMock,
-) -> None:
-    memory = Fastrr(
-        storage_path=Path("/tmp/s"),
-        worktree_root=Path("/tmp/w"),
-        repo_manager=fake_repo_manager,
-        model=mock_model,
-    )
-    memory.remember("alice", "some content")
-    assert "alice" in memory.list_users()
+    with patch("fastrr.agents.writer.Agent", return_value=mock_instance), patch(
+        "fastrr.agents.reader.Agent", return_value=mock_instance
+    ):
+        memory = Fastrr(
+            storage_path=Path("/tmp/s"),
+            repo_manager=fake_repo_manager,
+            model=mock_model,
+        )
+        memory.remember("some content")
+    assert mock_instance.run.called
 
 
 def test_remember_always_syncs(
@@ -80,18 +69,17 @@ def test_remember_always_syncs(
     mock_model: MagicMock,
     mock_agent_run: MagicMock,
 ) -> None:
-    """sync_user is always called; falls back to 'remember' when no COMMIT: line."""
+    """sync is always called; falls back to 'remember' when no COMMIT: line."""
     from unittest.mock import patch as _patch
 
-    with _patch.object(fake_repo_manager, "sync_user") as mock_sync:
+    with _patch.object(fake_repo_manager, "sync") as mock_sync:
         memory = Fastrr(
             storage_path=Path("/tmp/s"),
-            worktree_root=Path("/tmp/w"),
             repo_manager=fake_repo_manager,
             model=mock_model,
         )
-        memory.remember("alice", "likes cats")
-        mock_sync.assert_called_once_with("alice", message="remember")
+        memory.remember("likes cats")
+        mock_sync.assert_called_once_with(message="remember")
 
 
 def test_remember_uses_commit_message_from_agent(
@@ -103,21 +91,20 @@ def test_remember_uses_commit_message_from_agent(
 
     mock_instance = _Mock()
     mock_instance.run.return_value = _Mock(
-        content="Stored alice's preference.\nCOMMIT: add alice communication style to preferences.md"
+        content="Stored preference.\nCOMMIT: add communication style to preferences.md"
     )
 
     with _patch("fastrr.agents.writer.Agent", return_value=mock_instance), _patch(
         "fastrr.agents.reader.Agent", return_value=mock_instance
-    ), _patch.object(fake_repo_manager, "sync_user") as mock_sync:
+    ), _patch.object(fake_repo_manager, "sync") as mock_sync:
         memory = Fastrr(
             storage_path=Path("/tmp/s"),
-            worktree_root=Path("/tmp/w"),
             repo_manager=fake_repo_manager,
             model=mock_model,
         )
-        memory.remember("alice", "prefers bullet points")
+        memory.remember("prefers bullet points")
         mock_sync.assert_called_once_with(
-            "alice", message="add alice communication style to preferences.md"
+            message="add communication style to preferences.md"
         )
 
 
@@ -126,32 +113,30 @@ def test_recall_returns_mocked_string(
     mock_model: MagicMock,
     mock_agent_run: MagicMock,
 ) -> None:
-    fake_repo_manager.ensure_user_worktree("alice")
+    fake_repo_manager.ensure_workspace()
     memory = Fastrr(
         storage_path=Path("/tmp/s"),
-        worktree_root=Path("/tmp/w"),
         repo_manager=fake_repo_manager,
         model=mock_model,
     )
-    result = memory.recall("alice", query="x")
+    result = memory.recall(query="x")
     assert result == "mocked recall"
 
 
-def test_forget_then_list_users_excludes_user(
+def test_forget_clears_memory(
     fake_repo_manager,
     mock_model: MagicMock,
     mock_agent_run: MagicMock,
 ) -> None:
-    fake_repo_manager.ensure_user_worktree("alice")
+    fake_repo_manager.ensure_workspace()
     memory = Fastrr(
         storage_path=Path("/tmp/s"),
-        worktree_root=Path("/tmp/w"),
         repo_manager=fake_repo_manager,
         model=mock_model,
     )
-    assert "alice" in memory.list_users()
-    memory.forget("alice")
-    assert "alice" not in memory.list_users()
+    fake_repo_manager.get_workspace_path().joinpath("note.txt").write_text("x")
+    memory.forget()
+    assert not fake_repo_manager.get_workspace_path().joinpath("note.txt").exists()
 
 
 def test_history_limit_validation(
@@ -161,12 +146,11 @@ def test_history_limit_validation(
 ) -> None:
     memory = Fastrr(
         storage_path=Path("/tmp/s"),
-        worktree_root=Path("/tmp/w"),
         repo_manager=fake_repo_manager,
         model=mock_model,
     )
     with pytest.raises(ValueError, match="limit must be > 0"):
-        memory.history("alice", limit=0)
+        memory.history(limit=0)
 
 
 def test_history_maps_repo_entries(
@@ -174,7 +158,7 @@ def test_history_maps_repo_entries(
     mock_model: MagicMock,
     mock_agent_run: MagicMock,
 ) -> None:
-    fake_repo_manager.get_user_history = MagicMock(
+    fake_repo_manager.get_history = MagicMock(
         return_value=[
             RepoHistoryEntry(
                 commit="abc123",
@@ -187,43 +171,39 @@ def test_history_maps_repo_entries(
     )
     memory = Fastrr(
         storage_path=Path("/tmp/s"),
-        worktree_root=Path("/tmp/w"),
         repo_manager=fake_repo_manager,
         model=mock_model,
     )
-    events = memory.history("alice", limit=5)
+    events = memory.history(limit=5)
     assert events[0].changed_files == ["preferences.md"]
     assert "updated" in events[0].summary.lower()
 
 
-def test_history_empty_for_unknown_user(
+def test_history_empty(
     fake_repo_manager,
     mock_model: MagicMock,
     mock_agent_run: MagicMock,
 ) -> None:
     memory = Fastrr(
         storage_path=Path("/tmp/s"),
-        worktree_root=Path("/tmp/w"),
         repo_manager=fake_repo_manager,
         model=mock_model,
     )
-    assert memory.history("missing", limit=10) == []
+    assert memory.history(limit=10) == []
 
 
-def test_history_empty_for_unknown_user_with_git_repo(
+def test_history_empty_with_git_repo(
     tmp_path: Path,
     mock_model: MagicMock,
 ) -> None:
     storage = tmp_path / "repo"
-    worktrees = tmp_path / "worktrees"
-    repo_manager = GitRepoManager(storage, worktrees)
+    repo_manager = GitRepoManager(storage)
     with patch("fastrr.agents.writer.Agent", return_value=MagicMock()), patch(
         "fastrr.agents.reader.Agent", return_value=MagicMock()
     ):
         memory = Fastrr(
             storage_path=storage,
-            worktree_root=worktrees,
             repo_manager=repo_manager,
             model=mock_model,
         )
-    assert memory.history("missing", limit=10) == []
+    assert memory.history(limit=10) == []

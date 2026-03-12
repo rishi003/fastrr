@@ -6,9 +6,9 @@ from agno.models.base import Model
 from fastrr.agents.toolset import MemoryToolset
 
 _WRITER_INSTRUCTIONS = """
-You are a memory writer agent. Your job is to persist user memory to disk.
+You are a memory writer agent. Your job is to persist memory to disk.
 
-When asked to store a memory for a user:
+When asked to store a memory:
 1. Call list_files to see what files already exist in the workspace.
 2. Decide the best file to store this memory in (e.g. "preferences.md",
    "history.jsonl", "facts.md") based on the content type and existing files.
@@ -38,8 +38,8 @@ def _extract_commit_message(response) -> str:
 
 
 _REMOVE_INSTRUCTIONS = """
-You are a memory cleanup agent. Your job is to remove a user's workspace entirely.
-Call remove_user with the given user_id to delete all their memory.
+You are a memory cleanup agent. Your job is to clear all memory files.
+Call forget to remove all stored memory.
 """.strip()
 
 
@@ -53,21 +53,22 @@ class WriterAgent:
             model=model,
             tools=toolset.write_tools + [toolset.list_files],
             instructions=_WRITER_INSTRUCTIONS,
-            description="Stores and organises per-user memory on disk.",
+            description="Stores and organises memory on disk.",
         )
 
-    def store(self, user_id: str, content: str) -> None:
-        """Ask the agent to store `content` in the user's workspace."""
-        prompt = f"Store the following memory for user '{user_id}':\n\n{content}"
+    def store(self, content: str) -> None:
+        """Ask the agent to store `content` in the workspace."""
+        prompt = f"Store the following memory:\n\n{content}"
         response = self._agent.run(prompt)
         commit_msg = _extract_commit_message(response)
-        self._toolset.sync(user_id, message=commit_msg)
+        self._toolset.sync(message=commit_msg)
 
-    def remove(self, user_id: str) -> None:
-        """Remove the user's workspace entirely."""
+    def remove(self) -> None:
+        """Clear all stored memory."""
         remove_agent = Agent(
             model=self._model,
-            tools=[self._toolset.remove_user],
+            tools=[self._toolset.forget],
             instructions=_REMOVE_INSTRUCTIONS,
         )
-        remove_agent.run(f"Remove all memory for user '{user_id}'.")
+        remove_agent.run("Clear all memory.")
+        self._toolset.sync(message="forget memory")
