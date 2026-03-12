@@ -115,7 +115,17 @@ memory = Fastrr(
 | `GitRepoManager` | Default single-repo Git implementation |
 | `SearchStrategy` | Abstract search interface |
 | `RegexSearch` | Default regex-based search |
+| `MemoryHistoryEvent` | History event returned by `history()` |
+| `RepoHistoryEntry` | Raw repository history entry type |
 
 ```python
-from fastrr import Fastrr, RepoManager, GitRepoManager, SearchStrategy, RegexSearch
+from fastrr import (
+    Fastrr,
+    RepoManager,
+    GitRepoManager,
+    SearchStrategy,
+    RegexSearch,
+    MemoryHistoryEvent,
+    RepoHistoryEntry,
+)
 ```
