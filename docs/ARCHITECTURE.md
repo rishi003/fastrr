@@ -46,7 +46,11 @@ Accepts optional overrides for `repo_manager`, `model`, `search_strategy`, and
 
 An [Agno](https://github.com/agno-agi/agno) agent that:
 
-- **Store**: Receives content, decides where to put it (e.g. `preferences.md`, `history.jsonl`), and uses `write_file` or `append_file` + `sync`.
+- **Store**: Receives content, runs `SearchStrategy.search()` to pre-filter
+  existing related snippets, then calls the agent with those snippets injected
+  into the prompt. The agent follows five named phases (ASSESS → READ → DECIDE
+  → WRITE → COMMIT) to detect duplicates, update existing entries, or write new
+  ones.
 - **Remove**: Calls `forget` to clear memory files from the workspace.
 
 ### ReaderAgent
@@ -64,9 +68,10 @@ Plain Python callables that wrap `RepoManager` file operations. No AI framework 
 
 File discovery is **template-driven**: the list of workspace files is declared in the memory template and injected into agent instructions at construction time.
 
-| Read tools | Write tools |
-|------------|-------------|
-| `read_file` | `write_file`, `append_file`, `delete_file`, `sync`, `forget` |
+| Agent | Read tools | Write tools |
+|-------|------------|-------------|
+| ReaderAgent | `read_file` | — |
+| WriterAgent | `read_file` | `write_file`, `append_file`, `delete_file`, `sync`, `forget` |
 
 ### MemoryTemplate
 
@@ -104,11 +109,12 @@ Future: semantic/vector search (e.g. via RedisVL) can be plugged in by implement
 ### remember(content)
 
 1. Client calls `WriterAgent.store(content)`.
-2. Agent runs with prompt: "Store the following memory: ..."
-3. Agent consults the `Memory Files:` block in its instructions (injected from the template) to decide the target file (e.g. `preferences.md`).
-4. Agent calls `append_file` or `write_file`.
-5. Agent calls `sync` to commit changes.
-6. `GitRepoManager` commits to the current branch.
+2. `SearchStrategy.search(workspace, content)` pre-filters related snippets.
+3. Agent receives the content and snippets (if any) and runs five phases:
+   ASSESS (review snippets) → READ (read file if needed) → DECIDE
+   (UPDATE / WRITE NEW / SKIP) → WRITE → COMMIT.
+4. Agent calls `append_file`, `write_file`, or nothing depending on DECIDE.
+5. `GitRepoManager` commits to the current branch.
 
 ### recall(query=None)
 

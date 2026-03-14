@@ -79,7 +79,12 @@ class Fastrr:
         resolved_repo.initialize_workspace([f.name for f in template])
 
         toolset = MemoryToolset(resolved_repo)
-        self._writer = WriterAgent(toolset, resolved_model, memory_files=memory_files_text)
+        self._writer = WriterAgent(
+            toolset,
+            resolved_model,
+            memory_files=memory_files_text,
+            search_strategy=search_strategy,
+        )
         self._reader = ReaderAgent(
             toolset, resolved_model, search_strategy, memory_files=memory_files_text
         )

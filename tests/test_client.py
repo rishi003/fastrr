@@ -245,3 +245,21 @@ def test_init_does_not_overwrite_existing_template_files(
             model=mock_model,
         )
     assert existing.read_text() == "saved preference"
+
+
+def test_fastrr_passes_search_strategy_to_writer(
+    fake_repo_manager,
+    mock_model: MagicMock,
+) -> None:
+    """search_strategy passed to Fastrr is forwarded to WriterAgent."""
+    from fastrr.agents.search import SearchStrategy
+
+    custom_strategy = MagicMock(spec=SearchStrategy)
+    with patch("fastrr.agents.writer.Agent"), patch("fastrr.agents.reader.Agent"):
+        client = Fastrr(
+            storage_path=Path("/tmp/s"),
+            repo_manager=fake_repo_manager,
+            model=mock_model,
+            search_strategy=custom_strategy,
+        )
+    assert client._writer._search is custom_strategy

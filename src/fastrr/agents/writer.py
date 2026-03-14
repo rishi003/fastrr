@@ -1,8 +1,12 @@
 """WriterAgent: Agno agent responsible for storing and organising memory."""
 
+from pathlib import Path
+from typing import Optional
+
 from agno.agent import Agent
 from agno.models.base import Model
 
+from fastrr.agents.search import RegexSearch, SearchStrategy
 from fastrr.agents.toolset import MemoryToolset
 
 _WRITER_INSTRUCTIONS_TEMPLATE = """
@@ -11,19 +15,36 @@ You are a memory writer agent. Your job is to persist memory to disk.
 Memory Files:
 {memory_files}
 
-When asked to store a memory:
-1. Decide the best file to store this memory in based on the content type and
-   the Memory Files listed above.
-2. If the file exists and the new content belongs with existing content, use
-   append_file to add to it. If starting fresh, use write_file.
+PHASE 1 — ASSESS
+Review the pre-filtered snippets provided in the user message
+(format: [filename] matching line).
+Determine whether similar information is already stored.
+If no snippets were provided, proceed directly to PHASE 3.
 
-Use short, clear filenames. Prefer markdown for prose notes, JSONL for
-structured entries, and plain text for simple facts.
+PHASE 2 — READ
+If snippets indicate existing similar content, call read_file on the
+relevant file(s) to see the full current state before deciding what to write.
+
+PHASE 3 — DECIDE
+Choose exactly one action:
+  - UPDATE: existing content covers the same fact or preference — read the
+    file, merge new details, and rewrite the whole file with write_file.
+  - WRITE NEW: no sufficiently similar content exists — use append_file
+    or write_file as appropriate for the content type.
+  - SKIP: the incoming content is identical to what is already stored —
+    do nothing.
+
+PHASE 4 — WRITE
+Execute the chosen action. Use the Memory Files list above to pick the
+right target file. Prefer markdown for prose notes, JSONL for structured
+entries, and plain text for simple facts.
 Never make up data. Only store what you are explicitly given.
+Use short, clear filenames.
 
-End your response with exactly one line that summarises what you stored, in
-the imperative mood and under 72 characters. Prefix it with "COMMIT: ".
-Example: COMMIT: add preferred communication style to preferences.md
+PHASE 5 — COMMIT
+End your response with exactly one line summarising what you stored, in
+the imperative mood, under 72 characters. Prefix it with "COMMIT: ".
+Example: COMMIT: update preferred communication style in preferences.md
 """.strip()
 
 _COMMIT_PREFIX = "COMMIT: "
@@ -48,20 +69,39 @@ Call forget to remove all stored memory.
 class WriterAgent:
     """Agno-powered agent that writes and organises memory for a user."""
 
-    def __init__(self, toolset: MemoryToolset, model: Model, memory_files: str):
+    def __init__(
+        self,
+        toolset: MemoryToolset,
+        model: Model,
+        memory_files: str,
+        search_strategy: Optional[SearchStrategy] = None,
+    ):
         self._toolset = toolset
         self._model = model
+        self._search = search_strategy or RegexSearch()
         instructions = _WRITER_INSTRUCTIONS_TEMPLATE.format(memory_files=memory_files)
         self._agent = Agent(
             model=model,
-            tools=toolset.write_tools,
+            tools=toolset.read_tools + toolset.write_tools,
             instructions=instructions,
             description="Stores and organises memory on disk.",
         )
 
     def store(self, content: str) -> None:
         """Ask the agent to store `content` in the workspace."""
-        prompt = f"Store the following memory:\n\n{content}"
+        workspace = Path(self._toolset._repo.ensure_workspace())
+        snippets = self._search.search(workspace, content)
+
+        if snippets:
+            snippet_text = "\n".join(snippets)
+            prompt = (
+                f"Store the following memory:\n\n{content}\n\n"
+                f"Pre-filtered snippets of existing related content "
+                f"(format: [filename] matching line):\n{snippet_text}"
+            )
+        else:
+            prompt = f"Store the following memory:\n\n{content}"
+
         response = self._agent.run(prompt)
         commit_msg = _extract_commit_message(response)
         self._toolset.sync(message=commit_msg)
