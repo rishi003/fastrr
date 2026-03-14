@@ -24,14 +24,6 @@ class MemoryToolset:
 
     # ── Read tools ─────────────────────────────────────────────────────────
 
-    def list_files(self) -> str:
-        """
-        List all files in the memory workspace.
-        """
-        root = self._workspace()
-        files = [str(p.relative_to(root)) for p in root.rglob("*") if p.is_file()]
-        return json.dumps(files)
-
     def read_file(self, relative_path: str) -> str:
         """
         Read the full contents of a file from the memory workspace.
@@ -40,13 +32,6 @@ class MemoryToolset:
         if not path.exists():
             return json.dumps({"error": f"File not found: {relative_path}"})
         return path.read_text()
-
-    def file_exists(self, relative_path: str) -> str:
-        """
-        Check whether a file exists in the memory workspace.
-        """
-        exists = (self._workspace() / relative_path).exists()
-        return json.dumps({"exists": exists})
 
     # ── Write tools ────────────────────────────────────────────────────────
 
@@ -96,7 +81,7 @@ class MemoryToolset:
     @property
     def read_tools(self) -> list:
         """All read-only callables."""
-        return [self.list_files, self.read_file, self.file_exists]
+        return [self.read_file]
 
     @property
     def write_tools(self) -> list:

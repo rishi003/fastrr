@@ -5,14 +5,16 @@ from agno.models.base import Model
 
 from fastrr.agents.toolset import MemoryToolset
 
-_WRITER_INSTRUCTIONS = """
+_WRITER_INSTRUCTIONS_TEMPLATE = """
 You are a memory writer agent. Your job is to persist memory to disk.
 
+Memory Files:
+{memory_files}
+
 When asked to store a memory:
-1. Call list_files to see what files already exist in the workspace.
-2. Decide the best file to store this memory in (e.g. "preferences.md",
-   "history.jsonl", "facts.md") based on the content type and existing files.
-3. If the file exists and the new content belongs with existing content, use
+1. Decide the best file to store this memory in based on the content type and
+   the Memory Files listed above.
+2. If the file exists and the new content belongs with existing content, use
    append_file to add to it. If starting fresh, use write_file.
 
 Use short, clear filenames. Prefer markdown for prose notes, JSONL for
@@ -46,13 +48,14 @@ Call forget to remove all stored memory.
 class WriterAgent:
     """Agno-powered agent that writes and organises memory for a user."""
 
-    def __init__(self, toolset: MemoryToolset, model: Model):
+    def __init__(self, toolset: MemoryToolset, model: Model, memory_files: str):
         self._toolset = toolset
         self._model = model
+        instructions = _WRITER_INSTRUCTIONS_TEMPLATE.format(memory_files=memory_files)
         self._agent = Agent(
             model=model,
-            tools=toolset.write_tools + [toolset.list_files],
-            instructions=_WRITER_INSTRUCTIONS,
+            tools=toolset.write_tools,
+            instructions=instructions,
             description="Stores and organises memory on disk.",
         )
 

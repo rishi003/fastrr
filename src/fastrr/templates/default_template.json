@@ -1,0 +1,16 @@
+{
+  "files": [
+    {
+      "name": "preferences.md",
+      "description": "User preferences and settings"
+    },
+    {
+      "name": "history.jsonl",
+      "description": "Chronological memory entries in JSON Lines format. Each line is a JSON object with fields: timestamp (ISO-8601), type (string category), content (string detail)."
+    },
+    {
+      "name": "facts.md",
+      "description": "Standalone facts about the user"
+    }
+  ]
+}

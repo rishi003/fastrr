@@ -33,3 +33,12 @@ class RepoManager(ABC):
     def get_history(self, limit: int) -> list[RepoHistoryEntry]:
         """Return newest-first history entries for this workspace."""
         ...
+
+    def initialize_workspace(self, template_files: list[str]) -> None:
+        """Touch each template file in the workspace if it does not yet exist."""
+        workspace = Path(self.ensure_workspace())
+        for name in template_files:
+            p = workspace / name
+            if not p.exists():
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.touch()

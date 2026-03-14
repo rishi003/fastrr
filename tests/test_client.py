@@ -207,3 +207,41 @@ def test_history_empty_with_git_repo(
             model=mock_model,
         )
     assert memory.history(limit=10) == []
+
+
+def test_init_creates_template_files(
+    fake_repo_manager,
+    mock_model: MagicMock,
+) -> None:
+    """Fastrr.__init__ touches default template files in the workspace."""
+    with patch("fastrr.agents.writer.Agent", return_value=MagicMock()), patch(
+        "fastrr.agents.reader.Agent", return_value=MagicMock()
+    ):
+        Fastrr(
+            storage_path=Path("/tmp/s"),
+            repo_manager=fake_repo_manager,
+            model=mock_model,
+        )
+    workspace = fake_repo_manager.get_workspace_path()
+    assert (workspace / "preferences.md").exists()
+    assert (workspace / "history.jsonl").exists()
+    assert (workspace / "facts.md").exists()
+
+
+def test_init_does_not_overwrite_existing_template_files(
+    fake_repo_manager,
+    mock_model: MagicMock,
+) -> None:
+    """Template initialisation skips files that already have content."""
+    fake_repo_manager.ensure_workspace()
+    existing = fake_repo_manager.get_workspace_path() / "preferences.md"
+    existing.write_text("saved preference")
+    with patch("fastrr.agents.writer.Agent", return_value=MagicMock()), patch(
+        "fastrr.agents.reader.Agent", return_value=MagicMock()
+    ):
+        Fastrr(
+            storage_path=Path("/tmp/s"),
+            repo_manager=fake_repo_manager,
+            model=mock_model,
+        )
+    assert existing.read_text() == "saved preference"

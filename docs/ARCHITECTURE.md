@@ -22,7 +22,7 @@ retrieve memory on disk, backed by Git for versioning.
                                     ▼
                     ┌───────────────────────────────┐
                     │      MemoryToolset             │
-                    │  list_files, read_file,        │
+                    │  read_file,                    │
                     │  write_file, append_file,      │
                     │  sync, forget                  │
                     └───────────────┬───────────────┘
@@ -46,7 +46,7 @@ Accepts optional overrides for `repo_manager`, `model`, `search_strategy`, and
 
 An [Agno](https://github.com/agno-agi/agno) agent that:
 
-- **Store**: Receives content, inspects the workspace via `list_files`, decides where to put it (e.g. `preferences.md`, `history.jsonl`), and uses `write_file` or `append_file` + `sync`.
+- **Store**: Receives content, decides where to put it (e.g. `preferences.md`, `history.jsonl`), and uses `write_file` or `append_file` + `sync`.
 - **Remove**: Calls `forget` to clear memory files from the workspace.
 
 ### ReaderAgent
@@ -62,9 +62,20 @@ An Agno agent that:
 
 Plain Python callables that wrap `RepoManager` file operations. No AI framework dependency. These are registered as tools for the agents but can be used directly or adapted to other frameworks.
 
+File discovery is **template-driven**: the list of workspace files is declared in the memory template and injected into agent instructions at construction time.
+
 | Read tools | Write tools |
 |------------|-------------|
-| `list_files`, `read_file`, `file_exists` | `write_file`, `append_file`, `delete_file`, `sync`, `forget` |
+| `read_file` | `write_file`, `append_file`, `delete_file`, `sync`, `forget` |
+
+### MemoryTemplate
+
+A JSON file that declares the workspace file structure. Loaded once at `Fastrr` construction and used to:
+
+1. Initialise empty files in the workspace (if they do not yet exist) via `RepoManager.initialize_workspace`.
+2. Format the `Memory Files:` block injected into `WriterAgent` and `ReaderAgent` system instructions.
+
+The built-in default template (`src/fastrr/templates/default_template.json`) defines `preferences.md`, `history.jsonl`, and `facts.md`. A custom template path can be supplied via `FASTRR_MEMORY_TEMPLATE_PATH` or `FastrrConfig.memory_template_path`.
 
 ### RepoManager
 
@@ -94,8 +105,8 @@ Future: semantic/vector search (e.g. via RedisVL) can be plugged in by implement
 
 1. Client calls `WriterAgent.store(content)`.
 2. Agent runs with prompt: "Store the following memory: ..."
-3. Agent calls `list_files` → sees existing files.
-4. Agent decides target file (e.g. `preferences.md`) and calls `append_file` or `write_file`.
+3. Agent consults the `Memory Files:` block in its instructions (injected from the template) to decide the target file (e.g. `preferences.md`).
+4. Agent calls `append_file` or `write_file`.
 5. Agent calls `sync` to commit changes.
 6. `GitRepoManager` commits to the current branch.
 

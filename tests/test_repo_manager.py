@@ -72,6 +72,22 @@ def test_get_history_invalid_limit_raises(git_repo_manager: GitRepoManager) -> N
         git_repo_manager.get_history(limit=0)
 
 
+def test_initialize_workspace_creates_files(git_repo_manager: GitRepoManager) -> None:
+    git_repo_manager.initialize_workspace(["preferences.md", "history.jsonl", "facts.md"])
+    workspace = git_repo_manager.get_workspace_path()
+    assert (workspace / "preferences.md").exists()
+    assert (workspace / "history.jsonl").exists()
+    assert (workspace / "facts.md").exists()
+
+
+def test_initialize_workspace_skips_existing(git_repo_manager: GitRepoManager) -> None:
+    workspace = git_repo_manager.get_workspace_path()
+    git_repo_manager.ensure_workspace()
+    (workspace / "preferences.md").write_text("existing content")
+    git_repo_manager.initialize_workspace(["preferences.md"])
+    assert (workspace / "preferences.md").read_text() == "existing content"
+
+
 def test_get_history_limit_is_capped(git_repo_manager: GitRepoManager) -> None:
     git_repo_manager.ensure_workspace()
     workspace = git_repo_manager.get_workspace_path()

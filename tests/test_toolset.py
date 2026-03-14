@@ -7,19 +7,9 @@ import pytest
 from fastrr.agents.toolset import MemoryToolset
 
 
-def test_list_files_empty(fake_repo_manager) -> None:
-    fake_repo_manager.ensure_workspace()
+def test_read_tools_contains_only_read_file(fake_repo_manager) -> None:
     toolset = MemoryToolset(fake_repo_manager)
-    out = toolset.list_files()
-    assert json.loads(out) == []
-
-
-def test_list_files_after_write_file(fake_repo_manager) -> None:
-    fake_repo_manager.ensure_workspace()
-    toolset = MemoryToolset(fake_repo_manager)
-    toolset.write_file("preferences.md", "content")
-    out = toolset.list_files()
-    assert "preferences.md" in json.loads(out)
+    assert toolset.read_tools == [toolset.read_file]
 
 
 def test_write_file_read_file_round_trip(fake_repo_manager) -> None:
@@ -28,14 +18,6 @@ def test_write_file_read_file_round_trip(fake_repo_manager) -> None:
     toolset.write_file("notes.txt", "hello world")
     out = toolset.read_file("notes.txt")
     assert out == "hello world"
-
-
-def test_file_exists_true_false(fake_repo_manager) -> None:
-    fake_repo_manager.ensure_workspace()
-    toolset = MemoryToolset(fake_repo_manager)
-    toolset.write_file("x.txt", "x")
-    assert json.loads(toolset.file_exists("x.txt"))["exists"] is True
-    assert json.loads(toolset.file_exists("missing.txt"))["exists"] is False
 
 
 def test_append_file(fake_repo_manager) -> None:
@@ -53,7 +35,7 @@ def test_delete_file(fake_repo_manager) -> None:
     toolset.write_file("gone.txt", "content")
     out = toolset.delete_file("gone.txt")
     assert json.loads(out)["deleted"] == "gone.txt"
-    assert json.loads(toolset.file_exists("gone.txt"))["exists"] is False
+    assert not (fake_repo_manager.get_workspace_path() / "gone.txt").exists()
 
 
 def test_sync_returns_expected_json(fake_repo_manager) -> None:
@@ -64,16 +46,14 @@ def test_sync_returns_expected_json(fake_repo_manager) -> None:
     assert data["status"] == "ok"
 
 
-def test_forget_clears_workspace(
-    fake_repo_manager,
-) -> None:
+def test_forget_clears_workspace(fake_repo_manager) -> None:
     fake_repo_manager.ensure_workspace()
     toolset = MemoryToolset(fake_repo_manager)
     toolset.write_file("a.txt", "x")
-    assert json.loads(toolset.file_exists("a.txt"))["exists"] is True
+    assert (fake_repo_manager.get_workspace_path() / "a.txt").exists()
     out = toolset.forget()
     assert json.loads(out)["status"] == "ok"
-    assert json.loads(toolset.file_exists("a.txt"))["exists"] is False
+    assert not (fake_repo_manager.get_workspace_path() / "a.txt").exists()
 
 
 def test_read_file_missing_returns_error_json(fake_repo_manager) -> None:

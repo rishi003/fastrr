@@ -9,15 +9,17 @@ from agno.models.base import Model
 from fastrr.agents.search import RegexSearch, SearchStrategy
 from fastrr.agents.toolset import MemoryToolset
 
-_READER_INSTRUCTIONS = """
+_READER_INSTRUCTIONS_TEMPLATE = """
 You are a memory reader agent. Your job is to retrieve relevant memory.
 
+Memory Files:
+{memory_files}
+
 When asked to recall memory:
-1. Call list_files to see what files exist in the workspace.
-2. Call read_file for each file that might contain relevant information.
-3. Synthesise and return only the content that is relevant to the query.
+1. Call read_file for each file listed above that might contain relevant information.
+2. Synthesise and return only the content that is relevant to the query.
    If no query is given, summarise all memory.
-4. Return plain text. Be concise. Do not invent information.
+3. Return plain text. Be concise. Do not invent information.
 """.strip()
 
 
@@ -29,14 +31,16 @@ class ReaderAgent:
         toolset: MemoryToolset,
         model: Model,
         search_strategy: Optional[SearchStrategy] = None,
+        memory_files: str = "",
     ):
         self._toolset = toolset
         self._model = model
         self._search = search_strategy or RegexSearch()
+        instructions = _READER_INSTRUCTIONS_TEMPLATE.format(memory_files=memory_files)
         self._agent = Agent(
             model=model,
             tools=toolset.read_tools,
-            instructions=_READER_INSTRUCTIONS,
+            instructions=instructions,
             description="Retrieves and summarises memory from disk.",
         )
 

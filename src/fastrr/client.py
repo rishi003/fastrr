@@ -17,6 +17,7 @@ from fastrr.core.config import FastrrConfig
 from fastrr.history import MemoryHistoryEvent
 from fastrr.history_summary import summarize_memory_change
 from fastrr.services.repo_manager import GitRepoManager, RepoManager
+from fastrr.template import format_template, load_template
 
 
 def _build_model(config: FastrrConfig) -> Model:
@@ -39,6 +40,9 @@ class Fastrr:
     forget.
 
     LLM provider is configured via environment variables (see FastrrConfig).
+    The memory workspace is initialised from a template (default: preferences.md,
+    history.jsonl, facts.md) on first use. A custom template JSON can be supplied
+    via FASTRR_MEMORY_TEMPLATE_PATH or the config object.
 
     Example:
         from fastrr import Fastrr
@@ -70,9 +74,15 @@ class Fastrr:
         resolved_model = model or _build_model(cfg)
         resolved_repo = repo_manager or GitRepoManager(Path(storage_path))
 
+        template = load_template(cfg.memory_template_path)
+        memory_files_text = format_template(template)
+        resolved_repo.initialize_workspace([f.name for f in template])
+
         toolset = MemoryToolset(resolved_repo)
-        self._writer = WriterAgent(toolset, resolved_model)
-        self._reader = ReaderAgent(toolset, resolved_model, search_strategy)
+        self._writer = WriterAgent(toolset, resolved_model, memory_files=memory_files_text)
+        self._reader = ReaderAgent(
+            toolset, resolved_model, search_strategy, memory_files=memory_files_text
+        )
         self._repo = resolved_repo
 
     def remember(self, content: str) -> None:

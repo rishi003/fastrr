@@ -10,6 +10,7 @@ Fastrr uses LLM agents (via [Agno](https://github.com/agno-agi/agno)) for memory
 | `FASTRR_MODEL` | Model ID | `llama3.2` |
 | `OLLAMA_HOST` | Ollama server URL | `http://localhost:11434` |
 | `OPENROUTER_API_KEY` | API key for OpenRouter (required when `provider=openrouter`) | — |
+| `FASTRR_MEMORY_TEMPLATE_PATH` | Path to a custom memory template JSON file. When unset, the built-in default template (`preferences.md`, `history.jsonl`, `facts.md`) is used. | — |
 
 ## Providers
 
@@ -33,6 +34,41 @@ Uses [OpenRouter](https://openrouter.ai) to access various models (OpenAI, Anthr
 FASTRR_PROVIDER=openrouter
 FASTRR_MODEL=openai/gpt-4o
 OPENROUTER_API_KEY=sk-or-v1-...
+```
+
+## Memory Template
+
+The memory workspace is initialised from a template on first use. The template declares which files exist and their purpose, so agents know exactly where to read and write without needing to call `list_files` at runtime.
+
+The built-in default template contains three files:
+
+| File | Purpose |
+|------|---------|
+| `preferences.md` | User preferences and settings |
+| `history.jsonl` | Chronological entries (each line: `{"timestamp": ..., "type": ..., "content": ...}`) |
+| `facts.md` | Standalone facts about the user |
+
+To use a custom template, create a JSON file with the following structure and set `FASTRR_MEMORY_TEMPLATE_PATH`:
+
+```json
+{
+  "files": [
+    {"name": "preferences.md", "description": "User preferences and settings"},
+    {"name": "notes.md", "description": "Freeform notes"}
+  ]
+}
+```
+
+```bash
+FASTRR_MEMORY_TEMPLATE_PATH=/path/to/my_template.json
+```
+
+Or pass it directly at runtime:
+
+```python
+from fastrr.core.config import FastrrConfig
+config = FastrrConfig(memory_template_path="/path/to/my_template.json")
+memory = Fastrr(storage_path="./data/repo", config=config)
 ```
 
 ## Loading Order
