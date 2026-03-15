@@ -15,7 +15,7 @@ def test_config_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("FASTRR_MEMORY_TEMPLATE_PATH", raising=False)
     config = FastrrConfig()
     assert config.provider == "ollama"
-    assert config.model == "llama3.2"
+    assert config.model == "qwen3.5:4b"
     assert config.ollama_host == "http://localhost:11434"
     assert config.memory_template_path is None
 

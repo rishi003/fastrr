@@ -51,3 +51,19 @@ def test_format_template() -> None:
 
 def test_load_template_none_uses_default() -> None:
     assert load_template(None) == load_template()
+
+
+def test_default_template_history_description_requires_concise_events() -> None:
+    from fastrr.template import load_template
+
+    template = load_template(None)  # loads default
+    history = next(f for f in template if f.name == "history.jsonl")
+    assert "verbatim" in history.description.lower() or "concise" in history.description.lower()
+
+
+def test_default_template_facts_description_is_atemporal() -> None:
+    from fastrr.template import load_template
+
+    template = load_template(None)
+    facts = next(f for f in template if f.name == "facts.md")
+    assert "atemporal" in facts.description.lower() or "timestamp" in facts.description.lower()

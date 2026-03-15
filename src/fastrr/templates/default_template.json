@@ -2,15 +2,15 @@
   "files": [
     {
       "name": "preferences.md",
-      "description": "User preferences and settings"
+      "description": "Preferences and settings"
     },
     {
       "name": "history.jsonl",
-      "description": "Chronological memory entries in JSON Lines format. Each line is a JSON object with fields: timestamp (ISO-8601), type (string category), content (string detail)."
+      "description": "Chronological memory entries in JSON Lines format. Each line is a JSON object with fields: timestamp (ISO-8601), type (string category), content (string detail). This file is to track events and not full conversations. Events must be concise past-tense summaries. Never copy raw input verbatim."
     },
     {
       "name": "facts.md",
-      "description": "Standalone facts about the user"
+      "description": "Atemporal facts about the person — things that are true regardless of when they happened (e.g. occupation, location, relationships). No timestamps."
     }
   ]
 }

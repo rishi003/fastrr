@@ -23,23 +23,23 @@ If no snippets were provided, proceed directly to PHASE 3.
 
 PHASE 2 — READ
 If snippets indicate existing similar content, call read_file on the
-relevant file(s) to see the full current state before deciding what to write.
+relevant file(s) to see the full current state before planning.
 
-PHASE 3 — DECIDE
-Choose exactly one action:
-  - UPDATE: existing content covers the same fact or preference — read the
-    file, merge new details, and rewrite the whole file with write_file.
-  - WRITE NEW: no sufficiently similar content exists — use append_file
-    or write_file as appropriate for the content type.
-  - SKIP: the incoming content is identical to what is already stored —
-    do nothing.
+PHASE 3 — PLAN
+For each Memory File listed above, independently decide:
+  - Does the input contain information that belongs in this file,
+    based on its description?
+If yes, determine:
+  - action: append | update | skip (if already identical)
+  - distilled content: a concise rephrasing in your own words.
+    Never copy the raw input verbatim.
 
-PHASE 4 — WRITE
-Execute the chosen action. Use the Memory Files list above to pick the
-right target file. Prefer markdown for prose notes, JSONL for structured
-entries, and plain text for simple facts.
-Never make up data. Only store what you are explicitly given.
-Use short, clear filenames.
+Only include files where the answer is yes. It is fine if no file
+matches — do nothing.
+
+PHASE 4 — EXECUTE
+Execute every write in your plan. Files not in the plan are not touched.
+A single input may touch zero, one, or multiple files.
 
 PHASE 5 — COMMIT
 End your response with exactly one line summarising what you stored, in

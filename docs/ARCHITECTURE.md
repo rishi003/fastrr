@@ -48,9 +48,9 @@ An [Agno](https://github.com/agno-agi/agno) agent that:
 
 - **Store**: Receives content, runs `SearchStrategy.search()` to pre-filter
   existing related snippets, then calls the agent with those snippets injected
-  into the prompt. The agent follows five named phases (ASSESS → READ → DECIDE
-  → WRITE → COMMIT) to detect duplicates, update existing entries, or write new
-  ones.
+  into the prompt. The agent follows five phases (ASSESS → READ → PLAN → EXECUTE
+  → COMMIT): per-file routing based on template descriptions, distilled
+  content (no verbatim copy), and zero/one/multiple file writes per input.
 - **Remove**: Calls `forget` to clear memory files from the workspace.
 
 ### ReaderAgent

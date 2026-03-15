@@ -108,12 +108,25 @@ class TestWriterAgentPrompt:
         for phase in ["PHASE 1", "PHASE 2", "PHASE 3", "PHASE 4", "PHASE 5"]:
             assert phase in instructions, f"Missing {phase} in writer instructions"
 
-    def test_prompt_contains_decide_actions(self, fake_toolset, mock_model):
+    def test_prompt_plan_phase_contains_per_file_routing(self, fake_toolset, mock_model):
         with patch("fastrr.agents.writer.Agent") as MockAgent:
             WriterAgent(fake_toolset, mock_model, memory_files="pref.md")
         instructions = MockAgent.call_args.kwargs["instructions"]
-        for action in ["UPDATE", "WRITE NEW", "SKIP"]:
+        assert "PLAN" in instructions
+        for action in ["append", "update", "skip"]:
             assert action in instructions
+
+    def test_prompt_requires_distilled_content(self, fake_toolset, mock_model):
+        with patch("fastrr.agents.writer.Agent") as MockAgent:
+            WriterAgent(fake_toolset, mock_model, memory_files="pref.md")
+        instructions = MockAgent.call_args.kwargs["instructions"]
+        assert "verbatim" in instructions.lower()
+
+    def test_prompt_allows_multiple_file_writes(self, fake_toolset, mock_model):
+        with patch("fastrr.agents.writer.Agent") as MockAgent:
+            WriterAgent(fake_toolset, mock_model, memory_files="pref.md")
+        instructions = MockAgent.call_args.kwargs["instructions"]
+        assert "multiple" in instructions.lower() or "zero, one" in instructions.lower()
 
     def test_prompt_contains_commit_prefix(self, fake_toolset, mock_model):
         with patch("fastrr.agents.writer.Agent") as MockAgent:
