@@ -12,10 +12,11 @@ class FastrrConfig(BaseSettings):
     Reads from environment variables (or a .env file).
 
     Variables:
-        FASTRR_PROVIDER             - "ollama" (default) or "openrouter"
+        FASTRR_PROVIDER             - "ollama" (default), "openrouter", or "lmstudio"
         FASTRR_MODEL                - model id, e.g. "qwen3.5:4b" or "openai/gpt-4o"
         OPENROUTER_API_KEY          - required when provider is "openrouter"
         OLLAMA_HOST                 - Ollama server URL (default: http://localhost:11434)
+        LMSTUDIO_BASE_URL           - LM Studio server URL (default: http://localhost:1234)
         FASTRR_MEMORY_TEMPLATE_PATH - optional path to a custom memory template JSON file
     """
 
@@ -26,7 +27,7 @@ class FastrrConfig(BaseSettings):
         populate_by_name=True,
     )
 
-    provider: Literal["ollama", "openrouter"] = Field(
+    provider: Literal["ollama", "openrouter", "lmstudio"] = Field(
         default="ollama", validation_alias="FASTRR_PROVIDER"
     )
     model: str = Field(default="qwen3.5:4b", validation_alias="FASTRR_MODEL")
@@ -35,6 +36,9 @@ class FastrrConfig(BaseSettings):
     )
     ollama_host: str = Field(
         default="http://localhost:11434", validation_alias="OLLAMA_HOST"
+    )
+    lmstudio_base_url: str = Field(
+        default="http://localhost:1234/v1", validation_alias="LMSTUDIO_BASE_URL"
     )
     memory_template_path: Path | None = Field(
         default=None,

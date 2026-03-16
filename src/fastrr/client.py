@@ -26,6 +26,11 @@ def _build_model(config: FastrrConfig) -> Model:
 
         return OpenRouter(id=config.model, api_key=config.openrouter_api_key)
 
+    if config.provider == "lmstudio":
+        from agno.models.lmstudio import LMStudio
+
+        return LMStudio(id=config.model, base_url=config.lmstudio_base_url)
+
     from agno.models.ollama import Ollama
 
     return Ollama(id=config.model, host=config.ollama_host)
